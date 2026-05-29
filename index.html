@@ -1163,6 +1163,61 @@ button:hover {
     display: block;
 }
 
+#tmCompletedViewerModal .tmCvOrderRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+#tmCompletedViewerModal .tmCvOrderRow button.is-active-order {
+    box-shadow: inset 0 0 0 3px rgba(52,152,219,0.85);
+}
+#tmCvPreview {
+    width: min(420px, 78vw);
+    height: min(420px, 78vw);
+    margin: 10px auto;
+    background: #fff;
+    border-radius: 16px;
+    box-shadow: 0 12px 34px rgba(0,0,0,0.16);
+    position: relative;
+    overflow: hidden;
+}
+#tmCvPreview img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    visibility: hidden;
+}
+#tmCvMeta {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 900;
+    color: #2c3e50;
+    line-height: 1.5;
+}
+#tmCvStatusBadge {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 6px 12px;
+    border-radius: 14px;
+    background: rgba(44,62,80,0.12);
+    font-size: 11px;
+    font-weight: 900;
+}
+#tmCvLayerLabel {
+    margin-top: 6px;
+    font-size: 11px;
+    opacity: 0.9;
+}
+#tmCvNavRow {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 12px;
+}
+
 #tmPreview {
     width: min(520px, 84vw);
     height: min(520px, 84vw);
@@ -1281,6 +1336,7 @@ button:hover {
       </div>
 
       <div style="display:grid;gap:8px;margin-top:12px;">
+        <button type="button" class="tmBtn secondary" id="tmViewCompletedBtn">VIEW COMPLETED TRAITS</button>
         <button type="button" class="tmBtn secondary" id="tmOpenDatabaseBtn">REVIEW DATABASE</button>
         <button type="button" class="tmBtn good" id="tmSaveSnapshotBtn">SAVE SNAPSHOT</button>
         <button type="button" class="tmBtn good" id="tmExportBtn">EXPORT JSON</button>
@@ -1365,6 +1421,62 @@ button:hover {
 
       <div class="modal-buttons" style="margin-top:12px;">
         <button type="button" id="tmDbClose">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tmCompletedViewerModal" class="load-modal" aria-hidden="true">
+    <div class="load-modal-dialog" style="width:min(560px, 96vw);max-height:min(92vh, 900px);overflow:auto;">
+      <h4>COMPLETED TRAITS</h4>
+      <p style="margin:8px 0 0;font-size:11px;opacity:0.85;line-height:1.45;">Browse every saved hat + glasses combo in your chosen order. Layers match how you saved them.</p>
+
+      <div class="tmLabel" style="margin-top:12px;">BROWSE ORDER</div>
+      <div class="tmCvOrderRow">
+        <button type="button" class="tmBtn secondary" id="tmCvSortGlasses">BY GLASSES ORDER</button>
+        <button type="button" class="tmBtn secondary" id="tmCvSortHat">BY HAT ORDER</button>
+      </div>
+
+      <div id="tmCvPreview">
+        <img id="tmCv_skin" alt="">
+        <img id="tmCv_eyes" alt="">
+        <img id="tmCv_mouth" alt="">
+        <img id="tmCv_hat" alt="">
+        <img id="tmCv_accessories" alt="">
+      </div>
+
+      <div id="tmCvMeta">
+        <div id="tmCvPos">—</div>
+        <div id="tmCvNameHat">HAT: —</div>
+        <div id="tmCvNameGlasses">GLASSES: —</div>
+        <div id="tmCvStatusBadge">—</div>
+        <div id="tmCvLayerLabel">LAYER: —</div>
+      </div>
+
+      <div id="tmCvNavRow">
+        <button type="button" class="tmBtn secondary" id="tmCvPrev">← PREVIOUS</button>
+        <button type="button" class="tmBtn secondary" id="tmCvNext">NEXT →</button>
+      </div>
+
+      <button type="button" class="tmBtn swap" id="tmCvSwapLayers" style="width:100%;margin-top:10px;">🔄 SWAP LAYER ORDER (SAVE FIX)</button>
+      <p style="margin:8px 0 0;font-size:10px;opacity:0.8;line-height:1.4;text-align:center;">Use swap if hat/glasses stacking was saved wrong. Updates your database immediately.</p>
+
+      <div class="modal-buttons" style="margin-top:12px;">
+        <button type="button" id="tmCvClose">CLOSE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tmBlockedSwapModal" class="load-modal" aria-hidden="true">
+    <div class="load-modal-dialog" style="width:min(440px, 94vw);">
+      <h4>⚠ BLOCKED COMBO</h4>
+      <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:#2c3e50;">
+        This hat + glasses pair is marked <strong>BLOCKED</strong>. Are you sure you want to swap the layer order?
+      </p>
+      <p style="margin:8px 0 0;font-size:11px;opacity:0.85;line-height:1.45;">Choose what to save:</p>
+      <div style="display:grid;gap:8px;margin-top:12px;">
+        <button type="button" class="tmBtn bad" id="tmBlockedSwapKeep">KEEP BLOCKED — ONLY FIX LAYERS</button>
+        <button type="button" class="tmBtn swap" id="tmBlockedSwapToSwap">CHANGE TO SWAP (NEW STACK)</button>
+        <button type="button" class="tmBtn neutral" id="tmBlockedSwapCancel">CANCEL</button>
       </div>
     </div>
   </div>
@@ -3841,6 +3953,327 @@ return canvas;
     if (badge) badge.textContent = on ? 'FILTER ON' : 'FILTER OFF';
   }
 
+  var tmCompletedViewer = { queue: [], index: 0, sortBy: 'glasses', base: null };
+  var tmBlockedSwapPending = null;
+
+  function isSavedReview(entry) {
+    return normalizeReviewStatus(entry) !== 'untested';
+  }
+
+  function normalizeLayerMode(mode) {
+    var m = String(mode || '').trim().toLowerCase();
+    if (m === 'glasses_above_hat' || m === 'hat_above_glasses') return m;
+    return '';
+  }
+
+  /** How to draw hat vs glasses — saved layerMode first, else swap status → glasses on top. */
+  function resolveLayerMode(entry, fallback) {
+    fallback = normalizeLayerMode(fallback) || 'hat_above_glasses';
+    if (!entry) return fallback;
+
+    var explicit = normalizeLayerMode(entry.layerMode);
+    if (explicit) return explicit;
+
+    if (normalizeReviewStatus(entry) === 'swap') {
+      return 'glasses_above_hat';
+    }
+
+    return fallback;
+  }
+
+  function layerModeForSave(status, stateLayerMode) {
+    var session = normalizeLayerMode(stateLayerMode) || 'hat_above_glasses';
+    if (status === 'swap') {
+      return 'glasses_above_hat';
+    }
+    return session;
+  }
+
+  function formatStatusLabel(status) {
+    var map = {
+      allowed: '✅ WORKS',
+      blocked: '❌ BLOCKED',
+      swap: '🔄 SWAP',
+      offset: '⚠ OFFSET',
+      skipped: '⏭ SKIPPED',
+      untested: 'UNTESTED'
+    };
+    return map[status] || String(status || '').toUpperCase();
+  }
+
+  function formatLayerLabel(mode) {
+    if (mode === 'glasses_above_hat') return 'GLASSES ABOVE HAT';
+    if (mode === 'hat_above_glasses') return 'HAT ABOVE GLASSES';
+    return String(mode || 'DEFAULT').toUpperCase().replace(/_/g, ' ');
+  }
+
+  function setViewerLayerMode(mode) {
+    var hat = tmEl('tmCv_hat');
+    var gl = tmEl('tmCv_accessories');
+    if (!hat || !gl) return;
+    if (mode === 'glasses_above_hat') {
+      hat.style.zIndex = 70;
+      gl.style.zIndex = 80;
+    } else {
+      hat.style.zIndex = 80;
+      gl.style.zIndex = 70;
+    }
+  }
+
+  function buildCompletedQueue(hats, glasses, store, sortBy) {
+    var out = [];
+    function tryPush(h, g) {
+      var hid = traitId(h);
+      var gid = traitId(g);
+      var entry = getReviewEntry(store, hid, gid);
+      if (!isSavedReview(entry)) return;
+      out.push({ hat: h, glasses: g, hatId: hid, glassesId: gid, entry: entry });
+    }
+    if (sortBy === 'hat') {
+      for (var hi = 0; hi < hats.length; hi++) {
+        for (var gj = 0; gj < glasses.length; gj++) {
+          tryPush(hats[hi], glasses[gj]);
+        }
+      }
+    } else {
+      for (var gi = 0; gi < glasses.length; gi++) {
+        for (var hj = 0; hj < hats.length; hj++) {
+          tryPush(hats[hj], glasses[gi]);
+        }
+      }
+    }
+    return out;
+  }
+
+  function syncCompletedViewerOrderButtons() {
+    var btnG = tmEl('tmCvSortGlasses');
+    var btnH = tmEl('tmCvSortHat');
+    if (btnG) btnG.classList.toggle('is-active-order', tmCompletedViewer.sortBy === 'glasses');
+    if (btnH) btnH.classList.toggle('is-active-order', tmCompletedViewer.sortBy === 'hat');
+  }
+
+  function renderCompletedViewerItem() {
+    var q = tmCompletedViewer.queue;
+    if (!q.length) {
+      setImg('tmCv_skin', '');
+      setImg('tmCv_eyes', '');
+      setImg('tmCv_mouth', '');
+      setImg('tmCv_hat', '');
+      setImg('tmCv_accessories', '');
+      var posEl = tmEl('tmCvPos'); if (posEl) posEl.textContent = 'NO COMPLETED TRAITS YET';
+      var badge = tmEl('tmCvStatusBadge'); if (badge) badge.textContent = '—';
+      var layer = tmEl('tmCvLayerLabel'); if (layer) layer.textContent = 'LAYER: —';
+      return;
+    }
+    if (tmCompletedViewer.index < 0) tmCompletedViewer.index = 0;
+    if (tmCompletedViewer.index >= q.length) tmCompletedViewer.index = q.length - 1;
+    var item = q[tmCompletedViewer.index];
+    var base = tmCompletedViewer.base || { skin: '', eyes: '', mouth: '' };
+    var store = getCompatStore();
+    var entry = getReviewEntry(store, item.hatId, item.glassesId) || item.entry || {};
+    item.entry = entry;
+
+    setImg('tmCv_skin', base.skin);
+    setImg('tmCv_eyes', base.eyes);
+    setImg('tmCv_mouth', base.mouth);
+    setImg('tmCv_hat', item.hat.path || item.hat.image || '');
+    setImg('tmCv_accessories', item.glasses.path || item.glasses.image || '');
+
+    var layerMode = resolveLayerMode(entry);
+    setViewerLayerMode(layerMode);
+
+    var posEl = tmEl('tmCvPos');
+    if (posEl) {
+      posEl.textContent = 'ITEM ' + (tmCompletedViewer.index + 1) + ' / ' + q.length +
+        ' · ORDER: ' + (tmCompletedViewer.sortBy === 'hat' ? 'HAT' : 'GLASSES');
+    }
+    var nh = tmEl('tmCvNameHat'); if (nh) nh.textContent = 'HAT: ' + getTraitName(item.hat);
+    var ng = tmEl('tmCvNameGlasses'); if (ng) ng.textContent = 'GLASSES: ' + getTraitName(item.glasses);
+    var badge = tmEl('tmCvStatusBadge');
+    if (badge) badge.textContent = formatStatusLabel(normalizeReviewStatus(entry));
+    var layer = tmEl('tmCvLayerLabel');
+    if (layer) layer.textContent = 'LAYER: ' + formatLayerLabel(layerMode);
+  }
+
+  function startCompletedViewer(sortBy) {
+    var state = pickBaseTraits(getState());
+    var store = getCompatStore();
+    var hats = getPool(state.primarySlot);
+    var glasses = getPool(state.secondarySlot);
+    tmCompletedViewer.sortBy = sortBy === 'hat' ? 'hat' : 'glasses';
+    tmCompletedViewer.base = { skin: state.base.skin, eyes: state.base.eyes, mouth: state.base.mouth };
+    tmCompletedViewer.queue = buildCompletedQueue(hats, glasses, store, tmCompletedViewer.sortBy);
+    tmCompletedViewer.index = 0;
+    syncCompletedViewerOrderButtons();
+    renderCompletedViewerItem();
+    if (!tmCompletedViewer.queue.length && typeof alert === 'function') {
+      alert('NO COMPLETED TRAITS YET — REVIEW SOME COMBOS FIRST (OR IMPORT YOUR JSON).');
+    }
+  }
+
+  function openCompletedViewerModal() {
+    ensureTraitsReady().then(function () {
+      var modal = tmEl('tmCompletedViewerModal');
+      if (!modal) return;
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+      startCompletedViewer(tmCompletedViewer.sortBy || 'glasses');
+    }).catch(function () {
+      if (typeof alert === 'function') alert('TRAITS NOT LOADED YET — TRY AGAIN IN A MOMENT.');
+    });
+  }
+
+  function closeCompletedViewerModal() {
+    var modal = tmEl('tmCompletedViewerModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function advanceCompletedViewer(delta) {
+    if (!tmCompletedViewer.queue.length) return;
+    tmCompletedViewer.index += delta;
+    if (tmCompletedViewer.index < 0) tmCompletedViewer.index = tmCompletedViewer.queue.length - 1;
+    if (tmCompletedViewer.index >= tmCompletedViewer.queue.length) tmCompletedViewer.index = 0;
+    renderCompletedViewerItem();
+  }
+
+  function toggleLayerModeValue(mode) {
+    var cur = normalizeLayerMode(mode) || 'hat_above_glasses';
+    return cur === 'hat_above_glasses' ? 'glasses_above_hat' : 'hat_above_glasses';
+  }
+
+  function saveComboLayerEntry(hatId, glassesId, status, layerMode) {
+    var store = getCompatStore();
+    var prev = getReviewEntry(store, hatId, glassesId) || {};
+    setReviewEntry(store, hatId, glassesId, {
+      status: status,
+      layerMode: layerMode,
+      notes: prev.notes || '',
+      reviewedAt: nowIso()
+    });
+    setCompatStore(store);
+    return getReviewEntry(store, hatId, glassesId);
+  }
+
+  function applyLayerToPreview(source, layerMode) {
+    if (source === 'viewer') setViewerLayerMode(layerMode);
+    else setLayerMode(layerMode);
+  }
+
+  function openBlockedSwapModal() {
+    var modal = tmEl('tmBlockedSwapModal');
+    if (!modal) return;
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeBlockedSwapModal() {
+    var modal = tmEl('tmBlockedSwapModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+    tmBlockedSwapPending = null;
+  }
+
+  function refreshAfterLayerSwap(source, hatId, glassesId, updated) {
+    if (source === 'viewer') {
+      var item = tmCompletedViewer.queue[tmCompletedViewer.index];
+      if (item && item.hatId === hatId && item.glassesId === glassesId) {
+        item.entry = updated;
+      }
+      renderCompletedViewerItem();
+      return;
+    }
+    var state = getState();
+    var store = getCompatStore();
+    state.layerMode = resolveLayerMode(updated, state.layerMode);
+    setState(state);
+    var hats = getPool(state.primarySlot);
+    var glasses = getPool(state.secondarySlot);
+    var queue = computeQueue(hats, glasses, store, !!state.showUntested);
+    var idx = Math.min(state.queueIndex || 0, queue.length - 1);
+    if (queue[idx]) {
+      queue[idx].entry = updated;
+      renderCombo(queue[idx], state, store);
+    }
+  }
+
+  function commitLayerSwapForEntry(entry, nextLayer) {
+    var status = normalizeReviewStatus(entry);
+    if (status === 'untested') status = 'allowed';
+    var newStatus = status;
+    if (status === 'swap' && nextLayer === 'hat_above_glasses') {
+      newStatus = 'allowed';
+    } else if (status !== 'blocked' && status !== 'offset' && nextLayer === 'glasses_above_hat') {
+      newStatus = 'swap';
+    }
+    return { status: newStatus, layerMode: nextLayer };
+  }
+
+  function commitBlockedLayerSwap(choice) {
+    if (!tmBlockedSwapPending) return;
+    var p = tmBlockedSwapPending;
+    if (choice === 'cancel') {
+      applyLayerToPreview(p.source, p.prevLayer);
+      closeBlockedSwapModal();
+      return;
+    }
+    var newStatus = choice === 'keep_blocked' ? 'blocked' : 'swap';
+    var updated = saveComboLayerEntry(p.hatId, p.glassesId, newStatus, p.nextLayer);
+    closeBlockedSwapModal();
+    refreshAfterLayerSwap(p.source, p.hatId, p.glassesId, updated);
+  }
+
+  function requestLayerSwap(source) {
+    var hatId, glassesId, entry;
+
+    if (source === 'viewer') {
+      if (!tmCompletedViewer.queue.length) return;
+      var item = tmCompletedViewer.queue[tmCompletedViewer.index];
+      hatId = item.hatId;
+      glassesId = item.glassesId;
+      entry = getReviewEntry(getCompatStore(), hatId, glassesId) || item.entry || {};
+    } else {
+      var state = getState();
+      var store = getCompatStore();
+      var hats = getPool(state.primarySlot);
+      var glasses = getPool(state.secondarySlot);
+      var queue = computeQueue(hats, glasses, store, !!state.showUntested);
+      if (!queue.length) return;
+      var idx = Math.min(state.queueIndex || 0, queue.length - 1);
+      var combo = queue[idx];
+      hatId = combo.hatId;
+      glassesId = combo.glassesId;
+      entry = getReviewEntry(store, hatId, glassesId) || combo.entry || {};
+    }
+
+    var prevLayer = resolveLayerMode(entry, 'hat_above_glasses');
+    var nextLayer = toggleLayerModeValue(prevLayer);
+    var status = normalizeReviewStatus(entry);
+
+    if (status === 'blocked') {
+      tmBlockedSwapPending = {
+        source: source,
+        hatId: hatId,
+        glassesId: glassesId,
+        prevLayer: prevLayer,
+        nextLayer: nextLayer
+      };
+      applyLayerToPreview(source, nextLayer);
+      openBlockedSwapModal();
+      return;
+    }
+
+    var commit = commitLayerSwapForEntry(entry, nextLayer);
+    var updated = saveComboLayerEntry(hatId, glassesId, commit.status, commit.layerMode);
+    refreshAfterLayerSwap(source, hatId, glassesId, updated);
+  }
+
+  function swapCompletedViewerLayers() {
+    requestLayerSwap('viewer');
+  }
+
   // Queue order: GLASSES stay fixed while cycling through HATS.
   // We still cover all combinations, but the sequence is "glasses first" (outer loop glasses, inner loop hats).
   function computeQueue(hats, glasses, store, onlyUntested) {
@@ -3955,7 +4388,11 @@ return canvas;
     setState(state);
 
     var entry = combo.entry || getReviewEntry(store, combo.hatId, combo.glassesId);
-    var layerMode = entry && entry.layerMode ? entry.layerMode : state.layerMode;
+    var layerMode = resolveLayerMode(entry, state.layerMode);
+    if (entry && isSavedReview(entry)) {
+      state.layerMode = layerMode;
+      setState(state);
+    }
     setLayerMode(layerMode);
   }
 
@@ -3989,9 +4426,10 @@ return canvas;
     }
 
     var prev = getReviewEntry(store, combo.hatId, combo.glassesId) || {};
+    var savedLayer = layerModeForSave(status, state.layerMode);
     var entry = {
       status: status,
-      layerMode: state.layerMode || 'default',
+      layerMode: savedLayer,
       notes: prev.notes || '',
       reviewedAt: nowIso()
     };
@@ -4123,7 +4561,25 @@ return canvas;
     if (next) next.addEventListener('click', function () { var s = getState(); var st = getCompatStore(); var hats = getPool(s.primarySlot); var gl = getPool(s.secondarySlot); var q = computeQueue(hats, gl, st, !!s.showUntested); if (!q.length) return; var idx = advance(s, q, +1); renderCombo(q[idx], s, st); updateProgress(q, idx, st, hats, gl); });
 
     var b1 = tmEl('tmBtnAllowed'); if (b1) b1.addEventListener('click', function () { decide('allowed'); });
-    var b2 = tmEl('tmBtnSwap'); if (b2) b2.addEventListener('click', function () { decide('swap'); });
+    var b2 = tmEl('tmBtnSwap');
+    if (b2) b2.addEventListener('click', function () {
+      var s = getState();
+      var store = getCompatStore();
+      var hats = getPool(s.primarySlot);
+      var gl = getPool(s.secondarySlot);
+      var queue = computeQueue(hats, gl, store, !!s.showUntested);
+      if (!queue.length) return;
+      var combo = queue[Math.min(s.queueIndex || 0, queue.length - 1)];
+      var entry = getReviewEntry(store, combo.hatId, combo.glassesId) || combo.entry || {};
+      if (normalizeReviewStatus(entry) === 'blocked') {
+        requestLayerSwap('review');
+        return;
+      }
+      s.layerMode = 'glasses_above_hat';
+      setState(s);
+      setLayerMode('glasses_above_hat');
+      decide('swap');
+    });
     var b3 = tmEl('tmBtnOffset'); if (b3) b3.addEventListener('click', function () { decide('offset'); });
     var b4 = tmEl('tmBtnBlocked'); if (b4) b4.addEventListener('click', function () { decide('blocked'); });
     var b5 = tmEl('tmBtnSkip'); if (b5) b5.addEventListener('click', function () { decide('skipped'); });
@@ -4355,6 +4811,34 @@ return canvas;
       });
     }
 
+    var viewCompletedBtn = tmEl('tmViewCompletedBtn');
+    if (viewCompletedBtn) viewCompletedBtn.addEventListener('click', openCompletedViewerModal);
+    var cvClose = tmEl('tmCvClose');
+    if (cvClose) cvClose.addEventListener('click', closeCompletedViewerModal);
+    var cvModal = tmEl('tmCompletedViewerModal');
+    if (cvModal) cvModal.addEventListener('click', function (e) { if (e.target === cvModal) closeCompletedViewerModal(); });
+    var cvSortG = tmEl('tmCvSortGlasses');
+    if (cvSortG) cvSortG.addEventListener('click', function () { startCompletedViewer('glasses'); });
+    var cvSortH = tmEl('tmCvSortHat');
+    if (cvSortH) cvSortH.addEventListener('click', function () { startCompletedViewer('hat'); });
+    var cvPrev = tmEl('tmCvPrev');
+    if (cvPrev) cvPrev.addEventListener('click', function () { advanceCompletedViewer(-1); });
+    var cvNext = tmEl('tmCvNext');
+    if (cvNext) cvNext.addEventListener('click', function () { advanceCompletedViewer(+1); });
+    var cvSwap = tmEl('tmCvSwapLayers');
+    if (cvSwap) cvSwap.addEventListener('click', swapCompletedViewerLayers);
+
+    var blockedKeep = tmEl('tmBlockedSwapKeep');
+    if (blockedKeep) blockedKeep.addEventListener('click', function () { commitBlockedLayerSwap('keep_blocked'); });
+    var blockedToSwap = tmEl('tmBlockedSwapToSwap');
+    if (blockedToSwap) blockedToSwap.addEventListener('click', function () { commitBlockedLayerSwap('mark_swap'); });
+    var blockedCancel = tmEl('tmBlockedSwapCancel');
+    if (blockedCancel) blockedCancel.addEventListener('click', function () { commitBlockedLayerSwap('cancel'); });
+    var blockedModal = tmEl('tmBlockedSwapModal');
+    if (blockedModal) blockedModal.addEventListener('click', function (e) {
+      if (e.target === blockedModal) commitBlockedLayerSwap('cancel');
+    });
+
     var openDbBtn = tmEl('tmOpenDatabaseBtn'); if (openDbBtn) openDbBtn.addEventListener('click', openDb);
     var closeDbBtn = tmEl('tmDbClose'); if (closeDbBtn) closeDbBtn.addEventListener('click', closeDb);
     var modal = tmEl('tmDatabaseModal');
@@ -4372,6 +4856,22 @@ return canvas;
       if (mode !== 'trait-manager') return;
       var t = e.target;
       if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+
+      var blockedSwapOpen = tmEl('tmBlockedSwapModal');
+      if (blockedSwapOpen && blockedSwapOpen.classList.contains('show')) {
+        if (e.key === 'Escape') { e.preventDefault(); commitBlockedLayerSwap('cancel'); }
+        return;
+      }
+
+      var cvModalOpen = tmEl('tmCompletedViewerModal');
+      if (cvModalOpen && cvModalOpen.classList.contains('show')) {
+        if (e.key === 'ArrowRight') { e.preventDefault(); advanceCompletedViewer(+1); }
+        else if (e.key === 'ArrowLeft') { e.preventDefault(); advanceCompletedViewer(-1); }
+        else if (e.key === 's' || e.key === 'S') { e.preventDefault(); swapCompletedViewerLayers(); }
+        else if (e.key === 'Escape') { e.preventDefault(); closeCompletedViewerModal(); }
+        return;
+      }
+
       if (e.key === 'ArrowRight') { e.preventDefault(); if (next) next.click(); }
       else if (e.key === 'ArrowLeft') { e.preventDefault(); if (prev) prev.click(); }
       else if (e.key === '1') { e.preventDefault(); decide('allowed'); }
