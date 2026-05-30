@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Little Ollie Character Creator</title>
+<title>Little Ollie Trait Manager</title>
 <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1012,6 +1012,45 @@ button:hover {
 #modeGate button.creator { background: #16a085; color: #fff; }
 #modeGate button.tm { background: #2c3e50; color: #fff; }
 
+/* Trait Manager only — remove body class "trait-manager-only" to restore Character Creator picker */
+body.trait-manager-only #openCreatorModeBtn,
+body.trait-manager-only #tmBackToModesBtn,
+body.trait-manager-only #pageHeader {
+    display: none !important;
+}
+body.trait-manager-only #modeGate {
+    display: none !important;
+}
+
+#tmWelcomeModal {
+    z-index: 5000;
+}
+#tmWelcomeModal .welcome-brand {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+#tmWelcomeModal .welcome-stats {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-radius: 14px;
+    background: rgba(52,152,219,0.12);
+    box-shadow: inset 0 0 0 1px rgba(52,152,219,0.25);
+    font-size: 12px;
+    font-weight: 900;
+    color: #2c3e50;
+    text-align: center;
+    line-height: 1.45;
+}
+#tmWelcomeModal .welcome-actions {
+    display: grid;
+    gap: 10px;
+    margin-top: 14px;
+}
+
 #traitManagerView {
     display: none;
     position: fixed;
@@ -1172,6 +1211,11 @@ button:hover {
 #tmCompletedViewerModal .tmCvOrderRow button.is-active-order {
     box-shadow: inset 0 0 0 3px rgba(52,152,219,0.85);
 }
+#tmCompletedViewerModal .tmCvFilterRow {
+    display: grid;
+    gap: 8px;
+    margin-top: 8px;
+}
 #tmCvPreview {
     width: min(420px, 78vw);
     height: min(420px, 78vw);
@@ -1260,7 +1304,7 @@ button:hover {
 
 </style>
 </head>
-<body>
+<body class="trait-manager-only">
 <div id="transitionOverlay" aria-hidden="true"></div>
 <header id="pageHeader">
     <img id="headerImage" src="websitelogo3.png" alt="Little Ollie">
@@ -1436,6 +1480,16 @@ button:hover {
         <button type="button" class="tmBtn secondary" id="tmCvSortHat">BY HAT ORDER</button>
       </div>
 
+      <div class="tmLabel" style="margin-top:12px;">FILTER</div>
+      <div class="tmCvFilterRow">
+        <select id="tmCvFilterHat" class="tmSelect" aria-label="Filter by hat">
+          <option value="">ALL HATS</option>
+        </select>
+        <select id="tmCvFilterGlasses" class="tmSelect" aria-label="Filter by glasses">
+          <option value="">ALL GLASSES</option>
+        </select>
+      </div>
+
       <div id="tmCvPreview">
         <img id="tmCv_skin" alt="">
         <img id="tmCv_eyes" alt="">
@@ -1458,7 +1512,8 @@ button:hover {
       </div>
 
       <button type="button" class="tmBtn swap" id="tmCvSwapLayers" style="width:100%;margin-top:10px;">🔄 SWAP LAYER ORDER (SAVE FIX)</button>
-      <p style="margin:8px 0 0;font-size:10px;opacity:0.8;line-height:1.4;text-align:center;">Use swap if hat/glasses stacking was saved wrong. Updates your database immediately.</p>
+      <button type="button" class="tmBtn bad" id="tmCvBlockCombo" style="width:100%;margin-top:8px;">❌ BLOCK THIS COMBO</button>
+      <p style="margin:8px 0 0;font-size:10px;opacity:0.8;line-height:1.4;text-align:center;">Swap fixes layer order. Block marks this hat + glasses as incompatible. Both save immediately.</p>
 
       <div class="modal-buttons" style="margin-top:12px;">
         <button type="button" id="tmCvClose">CLOSE</button>
@@ -1478,6 +1533,24 @@ button:hover {
         <button type="button" class="tmBtn swap" id="tmBlockedSwapToSwap">CHANGE TO SWAP (NEW STACK)</button>
         <button type="button" class="tmBtn neutral" id="tmBlockedSwapCancel">CANCEL</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<div id="tmWelcomeModal" class="load-modal" aria-hidden="true">
+  <div class="load-modal-dialog" style="width:min(480px, 94vw);">
+    <div class="welcome-brand" aria-hidden="true">
+      <img src="websitelogo3.png" alt="" onerror="this.style.display='none'" style="height:58px;">
+      <img src="LO.png" alt="" onerror="this.style.display='none'" style="height:52px;">
+    </div>
+    <h4 style="margin-top:10px;text-align:center;">LITTLE OLLIE TRAIT MANAGER</h4>
+    <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:#2c3e50;text-align:center;">
+      Compatibility data loads from <strong>LOCompleteV5.json</strong> on each visit.
+    </p>
+    <div class="welcome-stats" id="tmWelcomeStats">Loading compatibility data…</div>
+    <div class="welcome-actions">
+      <button type="button" class="tmBtn good" id="tmWelcomeGoTM">GO TO TRAIT MANAGER</button>
+      <button type="button" class="tmBtn secondary" id="tmWelcomeReviewCompleted">REVIEW COMPLETED</button>
     </div>
   </div>
 </div>
@@ -3850,6 +3923,9 @@ return canvas;
   var LS_COMPAT = 'lo_trait_compatibility_v2';
   var LS_STATE = 'lo_trait_manager_state_v2';
   var LS_MODE = 'lo_app_mode_v2';
+  // Trait Manager only: body has class "trait-manager-only". Remove that class to show mode picker + Character Creator again.
+  var LO_TRAIT_MANAGER_ONLY = document.body.classList.contains('trait-manager-only');
+  var LO_COMPLETE_JSON = 'LOCompleteV5.json';
 
   function nowIso() { return new Date().toISOString(); }
   function safeJsonParse(raw, fallback) { try { return raw ? JSON.parse(raw) : fallback; } catch (e) { return fallback; } }
@@ -3885,6 +3961,73 @@ return canvas;
   }
   function setCompatStore(obj) {
     localStorage.setItem(LS_COMPAT, JSON.stringify(obj));
+  }
+
+  function importCompatPayload(obj) {
+    var data = obj && obj.data ? obj.data : obj;
+    if (!data || typeof data !== 'object') throw new Error('Invalid compatibility JSON');
+    if (!data.hats_vs_glasses) data.hats_vs_glasses = {};
+    setCompatStore(data);
+    return (obj && obj.completion) ? obj.completion : null;
+  }
+
+  function loadDefaultCompatData() {
+    var url = LO_COMPLETE_JSON + (LO_COMPLETE_JSON.indexOf('?') >= 0 ? '&' : '?') + 'v=' + Date.now();
+    return fetch(url).then(function (res) {
+      if (!res.ok) throw new Error('Failed to load ' + LO_COMPLETE_JSON + ' (' + res.status + ')');
+      return res.json();
+    }).then(function (obj) {
+      return importCompatPayload(obj);
+    });
+  }
+
+  function updateWelcomeStats(completion, message) {
+    var el = tmEl('tmWelcomeStats');
+    if (!el) return;
+    if (message) {
+      el.textContent = message;
+      return;
+    }
+    if (completion && completion.total != null) {
+      el.textContent = completion.reviewed + ' / ' + completion.total + ' combos reviewed (' + completion.percent + '% complete)';
+      return;
+    }
+    el.textContent = 'Compatibility data loaded.';
+  }
+
+  function openWelcomeModal() {
+    var modal = tmEl('tmWelcomeModal');
+    if (!modal) return;
+    modal.classList.add('show');
+    modal.setAttribute('aria-hidden', 'false');
+  }
+
+  function closeWelcomeModal() {
+    var modal = tmEl('tmWelcomeModal');
+    if (!modal) return;
+    modal.classList.remove('show');
+    modal.setAttribute('aria-hidden', 'true');
+  }
+
+  function enterTraitManager(rebuild) {
+    closeWelcomeModal();
+    showMode('trait-manager');
+    return ensureTraitsReady().then(function () {
+      if (rebuild) rebuildAndRender(true);
+    });
+  }
+
+  function wireWelcomeModal() {
+    var goBtn = tmEl('tmWelcomeGoTM');
+    if (goBtn) goBtn.addEventListener('click', function () {
+      enterTraitManager(true);
+    });
+    var reviewBtn = tmEl('tmWelcomeReviewCompleted');
+    if (reviewBtn) reviewBtn.addEventListener('click', function () {
+      enterTraitManager(false).then(function () {
+        openCompletedViewerModal();
+      });
+    });
   }
 
   function getState() {
@@ -3953,7 +4096,7 @@ return canvas;
     if (badge) badge.textContent = on ? 'FILTER ON' : 'FILTER OFF';
   }
 
-  var tmCompletedViewer = { queue: [], index: 0, sortBy: 'glasses', base: null };
+  var tmCompletedViewer = { queue: [], index: 0, sortBy: 'glasses', filterHatId: '', filterGlassesId: '', base: null };
   var tmBlockedSwapPending = null;
 
   function isSavedReview(entry) {
@@ -3966,17 +4109,17 @@ return canvas;
     return '';
   }
 
-  /** How to draw hat vs glasses — saved layerMode first, else swap status → glasses on top. */
+  /** How to draw hat vs glasses. SWAP status always means glasses above hat (layers swapped from default). */
   function resolveLayerMode(entry, fallback) {
     fallback = normalizeLayerMode(fallback) || 'hat_above_glasses';
     if (!entry) return fallback;
 
-    var explicit = normalizeLayerMode(entry.layerMode);
-    if (explicit) return explicit;
-
     if (normalizeReviewStatus(entry) === 'swap') {
       return 'glasses_above_hat';
     }
+
+    var explicit = normalizeLayerMode(entry.layerMode);
+    if (explicit) return explicit;
 
     return fallback;
   }
@@ -4020,11 +4163,13 @@ return canvas;
     }
   }
 
-  function buildCompletedQueue(hats, glasses, store, sortBy) {
+  function buildCompletedQueue(hats, glasses, store, sortBy, filterHatId, filterGlassesId) {
     var out = [];
     function tryPush(h, g) {
       var hid = traitId(h);
       var gid = traitId(g);
+      if (filterHatId && hid !== filterHatId) return;
+      if (filterGlassesId && gid !== filterGlassesId) return;
       var entry = getReviewEntry(store, hid, gid);
       if (!isSavedReview(entry)) return;
       out.push({ hat: h, glasses: g, hatId: hid, glassesId: gid, entry: entry });
@@ -4052,6 +4197,77 @@ return canvas;
     if (btnH) btnH.classList.toggle('is-active-order', tmCompletedViewer.sortBy === 'hat');
   }
 
+  function sortTraitsByName(list) {
+    return (list || []).slice().sort(function (a, b) {
+      return getTraitName(a).localeCompare(getTraitName(b), undefined, { sensitivity: 'base' });
+    });
+  }
+
+  function populateCompletedViewerFilterOptions(hats, glasses) {
+    var selHat = tmEl('tmCvFilterHat');
+    var selGl = tmEl('tmCvFilterGlasses');
+    if (!selHat || !selGl) return;
+
+    var keepHat = selHat.value || tmCompletedViewer.filterHatId || '';
+    var keepGl = selGl.value || tmCompletedViewer.filterGlassesId || '';
+
+    selHat.innerHTML = '<option value="">ALL HATS</option>' + sortTraitsByName(hats).map(function (t) {
+      var id = traitId(t);
+      return '<option value="' + id + '">' + getTraitName(t) + '</option>';
+    }).join('');
+    selGl.innerHTML = '<option value="">ALL GLASSES</option>' + sortTraitsByName(glasses).map(function (t) {
+      var id = traitId(t);
+      return '<option value="' + id + '">' + getTraitName(t) + '</option>';
+    }).join('');
+
+    selHat.value = keepHat;
+    selGl.value = keepGl;
+    if (selHat.value !== keepHat) selHat.value = '';
+    if (selGl.value !== keepGl) selGl.value = '';
+    tmCompletedViewer.filterHatId = selHat.value;
+    tmCompletedViewer.filterGlassesId = selGl.value;
+  }
+
+  function readCompletedViewerFilters() {
+    var selHat = tmEl('tmCvFilterHat');
+    var selGl = tmEl('tmCvFilterGlasses');
+    tmCompletedViewer.filterHatId = selHat ? selHat.value : '';
+    tmCompletedViewer.filterGlassesId = selGl ? selGl.value : '';
+  }
+
+  function completedViewerFilterLabel() {
+    var parts = [];
+    if (tmCompletedViewer.filterHatId) {
+      var selHat = tmEl('tmCvFilterHat');
+      var hatText = selHat && selHat.selectedIndex >= 0 ? selHat.options[selHat.selectedIndex].text : tmCompletedViewer.filterHatId;
+      parts.push('HAT: ' + hatText);
+    }
+    if (tmCompletedViewer.filterGlassesId) {
+      var selGl = tmEl('tmCvFilterGlasses');
+      var glText = selGl && selGl.selectedIndex >= 0 ? selGl.options[selGl.selectedIndex].text : tmCompletedViewer.filterGlassesId;
+      parts.push('GLASSES: ' + glText);
+    }
+    return parts.length ? parts.join(' · ') : '';
+  }
+
+  function refreshCompletedViewerQueue(resetIndex) {
+    var state = pickBaseTraits(getState());
+    var store = getCompatStore();
+    var hats = getPool(state.primarySlot);
+    var glasses = getPool(state.secondarySlot);
+    readCompletedViewerFilters();
+    tmCompletedViewer.base = { skin: state.base.skin, eyes: state.base.eyes, mouth: state.base.mouth };
+    tmCompletedViewer.queue = buildCompletedQueue(
+      hats, glasses, store, tmCompletedViewer.sortBy,
+      tmCompletedViewer.filterHatId, tmCompletedViewer.filterGlassesId
+    );
+    if (resetIndex) tmCompletedViewer.index = 0;
+    else if (tmCompletedViewer.index >= tmCompletedViewer.queue.length) {
+      tmCompletedViewer.index = Math.max(0, tmCompletedViewer.queue.length - 1);
+    }
+    renderCompletedViewerItem();
+  }
+
   function renderCompletedViewerItem() {
     var q = tmCompletedViewer.queue;
     if (!q.length) {
@@ -4060,7 +4276,15 @@ return canvas;
       setImg('tmCv_mouth', '');
       setImg('tmCv_hat', '');
       setImg('tmCv_accessories', '');
-      var posEl = tmEl('tmCvPos'); if (posEl) posEl.textContent = 'NO COMPLETED TRAITS YET';
+      var filterActive = tmCompletedViewer.filterHatId || tmCompletedViewer.filterGlassesId;
+      var posEl = tmEl('tmCvPos');
+      if (posEl) {
+        posEl.textContent = filterActive
+          ? 'NO COMPLETED COMBOS MATCH THIS FILTER'
+          : 'NO COMPLETED TRAITS YET';
+      }
+      var nh = tmEl('tmCvNameHat'); if (nh) nh.textContent = 'HAT: —';
+      var ng = tmEl('tmCvNameGlasses'); if (ng) ng.textContent = 'GLASSES: —';
       var badge = tmEl('tmCvStatusBadge'); if (badge) badge.textContent = '—';
       var layer = tmEl('tmCvLayerLabel'); if (layer) layer.textContent = 'LAYER: —';
       return;
@@ -4084,8 +4308,10 @@ return canvas;
 
     var posEl = tmEl('tmCvPos');
     if (posEl) {
+      var filterLine = completedViewerFilterLabel();
       posEl.textContent = 'ITEM ' + (tmCompletedViewer.index + 1) + ' / ' + q.length +
-        ' · ORDER: ' + (tmCompletedViewer.sortBy === 'hat' ? 'HAT' : 'GLASSES');
+        ' · ORDER: ' + (tmCompletedViewer.sortBy === 'hat' ? 'HAT' : 'GLASSES') +
+        (filterLine ? '\nFILTER: ' + filterLine : '');
     }
     var nh = tmEl('tmCvNameHat'); if (nh) nh.textContent = 'HAT: ' + getTraitName(item.hat);
     var ng = tmEl('tmCvNameGlasses'); if (ng) ng.textContent = 'GLASSES: ' + getTraitName(item.glasses);
@@ -4095,19 +4321,29 @@ return canvas;
     if (layer) layer.textContent = 'LAYER: ' + formatLayerLabel(layerMode);
   }
 
-  function startCompletedViewer(sortBy) {
+  function startCompletedViewer(sortBy, resetFilters) {
+    if (sortBy === 'hat' || sortBy === 'glasses') {
+      tmCompletedViewer.sortBy = sortBy;
+    }
+    if (resetFilters) {
+      tmCompletedViewer.filterHatId = '';
+      tmCompletedViewer.filterGlassesId = '';
+      var selHat = tmEl('tmCvFilterHat');
+      var selGl = tmEl('tmCvFilterGlasses');
+      if (selHat) selHat.value = '';
+      if (selGl) selGl.value = '';
+    }
     var state = pickBaseTraits(getState());
-    var store = getCompatStore();
     var hats = getPool(state.primarySlot);
     var glasses = getPool(state.secondarySlot);
-    tmCompletedViewer.sortBy = sortBy === 'hat' ? 'hat' : 'glasses';
-    tmCompletedViewer.base = { skin: state.base.skin, eyes: state.base.eyes, mouth: state.base.mouth };
-    tmCompletedViewer.queue = buildCompletedQueue(hats, glasses, store, tmCompletedViewer.sortBy);
-    tmCompletedViewer.index = 0;
+    populateCompletedViewerFilterOptions(hats, glasses);
     syncCompletedViewerOrderButtons();
-    renderCompletedViewerItem();
+    refreshCompletedViewerQueue(true);
     if (!tmCompletedViewer.queue.length && typeof alert === 'function') {
-      alert('NO COMPLETED TRAITS YET — REVIEW SOME COMBOS FIRST (OR IMPORT YOUR JSON).');
+      var filterActive = tmCompletedViewer.filterHatId || tmCompletedViewer.filterGlassesId;
+      alert(filterActive
+        ? 'NO COMPLETED COMBOS MATCH THIS FILTER.'
+        : 'NO COMPLETED TRAITS YET — REVIEW SOME COMBOS FIRST (OR IMPORT YOUR JSON).');
     }
   }
 
@@ -4117,7 +4353,7 @@ return canvas;
       if (!modal) return;
       modal.classList.add('show');
       modal.setAttribute('aria-hidden', 'false');
-      startCompletedViewer(tmCompletedViewer.sortBy || 'glasses');
+      startCompletedViewer(tmCompletedViewer.sortBy || 'glasses', true);
     }).catch(function () {
       if (typeof alert === 'function') alert('TRAITS NOT LOADED YET — TRY AGAIN IN A MOMENT.');
     });
@@ -4272,6 +4508,22 @@ return canvas;
 
   function swapCompletedViewerLayers() {
     requestLayerSwap('viewer');
+  }
+
+  function blockCompletedViewerCombo() {
+    if (!tmCompletedViewer.queue.length) return;
+    var item = tmCompletedViewer.queue[tmCompletedViewer.index];
+    var entry = getReviewEntry(getCompatStore(), item.hatId, item.glassesId) || item.entry || {};
+    var hatName = getTraitName(item.hat);
+    var glName = getTraitName(item.glasses);
+    if (typeof confirm === 'function' &&
+        !confirm('BLOCK THIS COMBO?\n\nHAT: ' + hatName + '\nGLASSES: ' + glName + '\n\nThis saves as ❌ BLOCKED in your database.')) {
+      return;
+    }
+    var layerMode = resolveLayerMode(entry);
+    var updated = saveComboLayerEntry(item.hatId, item.glassesId, 'blocked', layerMode);
+    item.entry = updated;
+    renderCompletedViewerItem();
   }
 
   // Queue order: GLASSES stay fixed while cycling through HATS.
@@ -4652,11 +4904,7 @@ return canvas;
         var reader = new FileReader();
         reader.onload = function (e) {
           try {
-            var obj = JSON.parse(e.target.result);
-            var data = obj && obj.data ? obj.data : obj;
-            if (!data || typeof data !== 'object') throw new Error('Bad file');
-            if (!data.hats_vs_glasses) data.hats_vs_glasses = data.hats_vs_glasses || {};
-            localStorage.setItem(LS_COMPAT, JSON.stringify(data));
+            importCompatPayload(JSON.parse(e.target.result));
             rebuildAndRender(true);
           } catch (err) {
             if (typeof alert === 'function') alert('INVALID FILE.');
@@ -4818,15 +5066,21 @@ return canvas;
     var cvModal = tmEl('tmCompletedViewerModal');
     if (cvModal) cvModal.addEventListener('click', function (e) { if (e.target === cvModal) closeCompletedViewerModal(); });
     var cvSortG = tmEl('tmCvSortGlasses');
-    if (cvSortG) cvSortG.addEventListener('click', function () { startCompletedViewer('glasses'); });
+    if (cvSortG) cvSortG.addEventListener('click', function () { startCompletedViewer('glasses', false); });
     var cvSortH = tmEl('tmCvSortHat');
-    if (cvSortH) cvSortH.addEventListener('click', function () { startCompletedViewer('hat'); });
+    if (cvSortH) cvSortH.addEventListener('click', function () { startCompletedViewer('hat', false); });
+    var cvFilterHat = tmEl('tmCvFilterHat');
+    if (cvFilterHat) cvFilterHat.addEventListener('change', function () { refreshCompletedViewerQueue(true); });
+    var cvFilterGlasses = tmEl('tmCvFilterGlasses');
+    if (cvFilterGlasses) cvFilterGlasses.addEventListener('change', function () { refreshCompletedViewerQueue(true); });
     var cvPrev = tmEl('tmCvPrev');
     if (cvPrev) cvPrev.addEventListener('click', function () { advanceCompletedViewer(-1); });
     var cvNext = tmEl('tmCvNext');
     if (cvNext) cvNext.addEventListener('click', function () { advanceCompletedViewer(+1); });
     var cvSwap = tmEl('tmCvSwapLayers');
     if (cvSwap) cvSwap.addEventListener('click', swapCompletedViewerLayers);
+    var cvBlock = tmEl('tmCvBlockCombo');
+    if (cvBlock) cvBlock.addEventListener('click', blockCompletedViewerCombo);
 
     var blockedKeep = tmEl('tmBlockedSwapKeep');
     if (blockedKeep) blockedKeep.addEventListener('click', function () { commitBlockedLayerSwap('keep_blocked'); });
@@ -4868,6 +5122,7 @@ return canvas;
         if (e.key === 'ArrowRight') { e.preventDefault(); advanceCompletedViewer(+1); }
         else if (e.key === 'ArrowLeft') { e.preventDefault(); advanceCompletedViewer(-1); }
         else if (e.key === 's' || e.key === 'S') { e.preventDefault(); swapCompletedViewerLayers(); }
+        else if (e.key === 'b' || e.key === 'B') { e.preventDefault(); blockCompletedViewerCombo(); }
         else if (e.key === 'Escape') { e.preventDefault(); closeCompletedViewerModal(); }
         return;
       }
@@ -4905,19 +5160,33 @@ return canvas;
 
   wireModeGate();
   wireTMOnce();
+  wireWelcomeModal();
 
-  // Always start on the mode chooser so the user can pick Creator vs Trait Manager.
-  // (We still support deep-linking via URL hash: #creator or #trait-manager.)
-  var startMode = 'select';
+  // Default start mode. In trait-manager-only mode, show welcome popup first (use #creator hash to reach Character Creator).
+  var startMode = LO_TRAIT_MANAGER_ONLY ? 'trait-manager' : 'select';
   var hash = (location.hash || '').replace(/^#/, '').toLowerCase().trim();
   if (hash === 'creator' || hash === 'trait-manager' || hash === 'select') {
     startMode = hash;
   }
-  // Ensure any previously remembered mode doesn't auto-skip the gate next load.
-  try { localStorage.setItem(LS_MODE, 'select'); } catch (e) {}
-  showMode(startMode);
-  if (startMode === 'trait-manager') {
-    ensureTraitsReady().then(function () { rebuildAndRender(true); });
+  if (LO_TRAIT_MANAGER_ONLY && startMode === 'select') {
+    startMode = 'trait-manager';
+  }
+  try { localStorage.setItem(LS_MODE, startMode); } catch (e) {}
+
+  if (LO_TRAIT_MANAGER_ONLY && hash !== 'creator') {
+    openWelcomeModal();
+    updateWelcomeStats(null, 'Loading compatibility data…');
+    ensureTraitsReady().catch(function () {});
+    loadDefaultCompatData()
+      .then(function (completion) { updateWelcomeStats(completion); })
+      .catch(function () {
+        updateWelcomeStats(null, 'Could not load LOCompleteV5.json — use Import JSON in Trait Manager, or run via http://localhost.');
+      });
+  } else {
+    showMode(startMode);
+    if (startMode === 'trait-manager') {
+      ensureTraitsReady().then(function () { rebuildAndRender(true); });
+    }
   }
 })();
 
